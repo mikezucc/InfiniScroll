@@ -34,7 +34,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
     var panGest:UIPanGestureRecognizer!
 
     var mInitialPoint:CGPoint = CGPointMake(0, 0)
-    var mInitialTime:UInt64 = 0
+    var mInitialTime:NSTimeInterval = 0
 
     var pointHistory:[CGPoint] = []
 
@@ -52,7 +52,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
     }
 
     struct Velocity {
-        var time:UInt64
+        var time:NSTimeInterval
         var velocity:CGPoint
     }
 
@@ -63,7 +63,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
     let kFRAMEFLOAT:CGFloat = CGFloat(1)
     let kFRAMEUINT64:UInt64 = 1
 
-    var lastRequestTime:UInt64 = 0
+    var lastRequestTime:NSTimeInterval = 0
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -88,7 +88,7 @@ class ViewController: UIViewController, UIScrollViewDelegate {
 
         if (dragging) { return }
 
-        let timestmap = mach_absolute_time()
+        let timestmap = NSDate.timeIntervalSinceReferenceDate()
 
         if (self.lastRequestTime == 0) {
             self.lastRequestTime = timestmap
@@ -104,7 +104,6 @@ class ViewController: UIViewController, UIScrollViewDelegate {
             released = false
         } else if (decaying) {
 
-            let timestmap = timestmap
             let timeDiff =  CGFloat(timestmap-self.lastRequestTime)
 
             // -5u/tu/tu gravity
@@ -137,31 +136,35 @@ class ViewController: UIViewController, UIScrollViewDelegate {
         decaying = false
         self.veloHistory = []
         self.mInitialPoint = touches.first!.locationInView(self.view)
-        self.mInitialTime = mach_absolute_time()
+        self.mInitialTime = NSDate.timeIntervalSinceReferenceDate()
     }
 
     override func touchesMoved(touches: Set<UITouch>, withEvent event: UIEvent?) {
-        let stamp = mach_absolute_time()
+        let stamp = NSDate.timeIntervalSinceReferenceDate()
         let currPoint = touches.first!.locationInView(self.view)
+
         if (self.veloHistory.count == 0) {
             let timeDiff = CGFloat(stamp - self.mInitialTime)
+            print("timeDiff \(timeDiff)")
             let velocity = Velocity(time: stamp, velocity: CGPointMake((currPoint.x-self.mInitialPoint.x)/timeDiff, (currPoint.y-self.mInitialPoint.y)/timeDiff))
             self.veloHistory.append(velocity)
+            self.prevTouch = currPoint
             return
         } else {
             let latestVelo = self.veloHistory.last!
             let timeDiff = CGFloat(stamp - latestVelo.time)
+            print("timeDiff \(timeDiff)")
             let currPoint = touches.first!.locationInView(self.view)
             // decay velocity
-            let velocity = Velocity(time: stamp, velocity: CGPointMake((currPoint.x-self.mInitialPoint.x)/timeDiff, (currPoint.y-self.mInitialPoint.y)/timeDiff))
+            let velocity = Velocity(time: stamp, velocity: CGPointMake((currPoint.x-self.prevTouch.x)/timeDiff, (currPoint.y-self.prevTouch.y)/timeDiff))
             if (self.veloHistory.count >= kVELOTHRESH) {
                 self.veloHistory.removeAtIndex(0)
             }
             self.veloHistory.append(velocity)
+            self.prevTouch = currPoint
+            let offset = CGPointMake(velocity.velocity.x * timeDiff, velocity.velocity.y * timeDiff)
+            performCellTransform(vector: offset)
         }
-        let timeDiff =  CGFloat(stamp-self.lastRequestTime)
-        let offset = CGPointMake(self.decayingVelocity.x * timeDiff, self.decayingVelocity.y * timeDiff)
-        performCellTransform(vector: offset)
     }
 
     override func touchesEnded(touches: Set<UITouch>, withEvent event: UIEvent?) {
